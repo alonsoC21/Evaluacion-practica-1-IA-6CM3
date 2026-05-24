@@ -8,7 +8,7 @@ def hill_climbing(problem):
     current_state = problem.get_initial_state()
     current_cost = problem.get_attacks(current_state)
 
-    # Entregamos el estado inicial a la vista para que lo dibuje
+    # Se entrega el estado inicial a la vista para que lo dibuje
     yield {
         "tablero": current_state, 
         "ataques": current_cost, 
@@ -16,7 +16,7 @@ def hill_climbing(problem):
     }
 
     while True:
-        # Si ya es la meta (0 ataques), terminamos con éxito
+        # Si ya es la meta (0 ataques), acaba con exito
         if problem.is_goal(current_state):
             yield {
                 "tablero": current_state, 
