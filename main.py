@@ -54,11 +54,10 @@ def dibujar_reinas(screen, state_dict, font_info, font_title):
     screen.blit(texto_ataques, (WIDTH//2 - texto_ataques.get_width()//2, 20))
     screen.blit(texto_msg, (WIDTH//2 - texto_msg.get_width()//2, 60))
 
-    # 2. Dibujar el tablero de 64 casillas (Desplazado hacia abajo)
+    # 2. Dibujar el tablero de 64 casillas
     for row in range(8):
         for col in range(8):
             color = WHITE if (row + col) % 2 == 0 else GRAY
-            # Sumamos TABLERO_Y a la coordenada Y para bajar el tablero
             rect = pygame.Rect(col * tamano_celda, TABLERO_Y + (row * tamano_celda), tamano_celda, tamano_celda)
             pygame.draw.rect(screen, color, rect)
             
