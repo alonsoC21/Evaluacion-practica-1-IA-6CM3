@@ -1,6 +1,7 @@
 import pygame
 import sys
 import time
+import os
 
 from environments.eight_queens import EightQueens
 from algorithms.local import hill_climbing
@@ -37,7 +38,7 @@ def dibujar_boton(screen, font, text, x, y, w, h, mouse_pos):
     screen.blit(text_surf, text_rect)
     return rect
 
-def dibujar_reinas(screen, state_dict, font_info, font_title):
+def dibujar_reinas(screen, state_dict, font_info, font_title, imagen_reina):
     if not state_dict or "tablero" not in state_dict:
         return
 
@@ -46,27 +47,30 @@ def dibujar_reinas(screen, state_dict, font_info, font_title):
 
     # 1. Dibujar Panel Superior (Mensajes y Ataques)
     pygame.draw.rect(screen, WHITE, (0, 0, WIDTH, TABLERO_Y))
-    
     texto_ataques = font_title.render(f"Ataques (Costo): {state_dict['ataques']}", True, RED)
     texto_msg = font_info.render(state_dict['mensaje'], True, BLACK)
-    
-    # Centrar los textos en el panel superior
     screen.blit(texto_ataques, (WIDTH//2 - texto_ataques.get_width()//2, 20))
     screen.blit(texto_msg, (WIDTH//2 - texto_msg.get_width()//2, 60))
 
-    # 2. Dibujar el tablero de 64 casillas (Desplazado hacia abajo)
+    # 2. Dibujar el tablero de 64 casillas
     for row in range(8):
         for col in range(8):
             color = WHITE if (row + col) % 2 == 0 else GRAY
-            # Sumamos TABLERO_Y a la coordenada Y para bajar el tablero
             rect = pygame.Rect(col * tamano_celda, TABLERO_Y + (row * tamano_celda), tamano_celda, tamano_celda)
             pygame.draw.rect(screen, color, rect)
             
+            # 3. DIBUJAR LA REINA
             if tablero[col] == row:
-                pygame.draw.circle(screen, BLUE, rect.center, tamano_celda // 3)
-                pygame.draw.circle(screen, BLACK, rect.center, tamano_celda // 3, 2)
+                if imagen_reina:
+                    img_x = rect.x + (tamano_celda - imagen_reina.get_width()) // 2
+                    img_y = rect.y + (tamano_celda - imagen_reina.get_height()) // 2
+                    screen.blit(imagen_reina, (img_x, img_y))
+                else:
+                    # Plan de respaldo: Círculo azul si no hay imagen
+                    pygame.draw.circle(screen, BLUE, rect.center, tamano_celda // 3)
+                    pygame.draw.circle(screen, BLACK, rect.center, tamano_celda // 3, 2)
 
-    # Separador visual (línea negra inferior)
+    # Separador visual
     pygame.draw.line(screen, BLACK, (0, TABLERO_Y + 600), (WIDTH, TABLERO_Y + 600), 2)
 
 # --- BUCLE PRINCIPAL ---
@@ -80,6 +84,14 @@ def main():
     font_info = pygame.font.SysFont(None, 32)
     clock = pygame.time.Clock()
     
+    try:
+        ruta_imagen = os.path.join("assets", "reina.png")
+        img_original = pygame.image.load(ruta_imagen).convert_alpha()
+        nuevo_tamano = int((WIDTH // 8) * 1)
+        imagen_reina = pygame.transform.scale(img_original, (nuevo_tamano, nuevo_tamano))
+    except (pygame.error, FileNotFoundError):
+        print("Aviso: No se encontró 'assets/reina.png'. Usando círculos por defecto.")
+
     estado = "MENU_PROBLEMA"
     problema_seleccionado = None
     algoritmo_seleccionado = None
@@ -145,7 +157,7 @@ def main():
 
         elif estado == "VISUALIZACION":
             if problema_seleccionado == "8 Reinas (Local)":
-                dibujar_reinas(screen, estado_actual, font_info, font_title)
+                dibujar_reinas(screen, estado_actual, font_info, font_title, imagen_reina)
                 
                 # Avanzar algoritmo automáticamente
                 if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
