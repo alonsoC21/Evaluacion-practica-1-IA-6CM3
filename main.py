@@ -4,7 +4,8 @@ import time
 import os
 
 from environments.eight_queens import EightQueens
-from algorithms.local import hill_climbing
+from environments.eight_queens import EightQueens
+from algorithms.local import hill_climbing, simulated_annealing
 
 # --- CONFIGURACIÓN VISUAL ---
 WIDTH = 600
@@ -22,7 +23,7 @@ RED = (255, 50, 50)
 MENU_DATA = {
     "Frozen Lake (No Informada)": ["BFS (Anchura)", "DFS (Profundidad)"],
     "Sokoban (Informada)": ["A-Estrella (A*)", "Voraz (Greedy)"],
-    "8 Reinas (Local)": ["Hill Climbing"],
+    "8 Reinas (Local)": ["Hill Climbing", "Recocido Simulado"],
     "Gato (Adversaria)": ["Minimax", "Poda Alfa-Beta"]
 }
 
@@ -141,13 +142,18 @@ def main():
                 if btn.collidepoint(mouse_pos) and click:
                     algoritmo_seleccionado = algoritmo
                     
-                    if problema_seleccionado == "8 Reinas (Local)" and algoritmo_seleccionado == "Hill Climbing":
+                    if problema_seleccionado == "8 Reinas (Local)":
                         problema = EightQueens()
-                        generador_algoritmo = hill_climbing(problema)
+                        if algoritmo_seleccionado == "Hill Climbing":
+                            generador_algoritmo = hill_climbing(problema)
+                        elif algoritmo_seleccionado == "Recocido Simulado":
+                            generador_algoritmo = simulated_annealing(problema)
+                            
                         try:
                             estado_actual = next(generador_algoritmo)
                         except StopIteration:
                             pass
+                    
                     estado = "VISUALIZACION"
                 y_offset += 80
                 
@@ -174,10 +180,13 @@ def main():
                 # Botón de Reintentar (Izquierda)
                 btn_retry = dibujar_boton(screen, font_button, "Reintentar", 60, HEIGHT - 45, 200, 35, mouse_pos)
                 if btn_retry.collidepoint(mouse_pos) and click:
-                    # Reinicia la instancia del problema y el generador
-                    if algoritmo_seleccionado == "Hill Climbing":
+                    if problema_seleccionado == "8 Reinas (Local)":
                         problema = EightQueens()
-                        generador_algoritmo = hill_climbing(problema)
+                        if algoritmo_seleccionado == "Hill Climbing":
+                            generador_algoritmo = hill_climbing(problema)
+                        elif algoritmo_seleccionado == "Recocido Simulado":
+                            generador_algoritmo = simulated_annealing(problema)
+                            
                         try:
                             estado_actual = next(generador_algoritmo)
                         except StopIteration:
