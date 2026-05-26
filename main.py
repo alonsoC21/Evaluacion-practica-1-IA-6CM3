@@ -7,6 +7,10 @@ from environments.eight_queens import EightQueens
 from environments.eight_queens import EightQueens
 from algorithms.local import hill_climbing, simulated_annealing
 
+# --- Imports: No informado 
+from environments.frozen_lake import FrozenLake
+from algorithms.uninformed import bfs, dfs
+
 # --- CONFIGURACIÓN VISUAL ---
 WIDTH = 600
 HEIGHT = 750     
@@ -26,6 +30,15 @@ MENU_DATA = {
     "8 Reinas (Local)": ["Hill Climbing", "Recocido Simulado"],
     "Gato (Adversaria)": ["Minimax", "Poda Alfa-Beta"]
 }
+
+
+# -- Configuracion visual - No informado 
+LIGHT_BLUE  = (100, 180, 255)   # Celdas visitadas
+YELLOW      = (255, 230, 100)   # Frontera activa
+ORANGE      = (255, 140,   0)   # Nodo actual
+DARK_RED    = (180,  50,  50)   # Hoyos
+GOLD        = (255, 200,   0)   # Meta
+
 
 # --- FUNCIONES DE INTERFAZ ---
 def dibujar_boton(screen, font, text, x, y, w, h, mouse_pos):
@@ -73,6 +86,99 @@ def dibujar_reinas(screen, state_dict, font_info, font_title, imagen_reina):
 
     # Separador visual
     pygame.draw.line(screen, BLACK, (0, TABLERO_Y + 600), (WIDTH, TABLERO_Y + 600), 2)
+
+# -- Funciones de visualización para algoritmos no informados (BFS, DFS) ---
+def dibujar_frozen_lake(screen, estado_dict, font_info, font_title):
+    """
+    Dibuja el laberinto Frozen Lake con su estado visual actual.
+    Recibe el diccionario que yieldeó el algoritmo.
+    """
+    if not estado_dict or "mapa" not in estado_dict:
+        return
+
+    mapa       = estado_dict["mapa"]
+    visitados  = estado_dict["visitados"]
+    frontera   = estado_dict["frontera"]
+    camino     = set(estado_dict["camino"])
+    pos_actual = estado_dict["pos_actual"]
+    encontrado = estado_dict["encontrado"]
+    pasos      = estado_dict["pasos"]
+    mensaje    = estado_dict["mensaje"]
+
+    filas    = len(mapa)
+    columnas = len(mapa[0])
+
+    # Tamaño de cada celda para que el grid quepa en WIDTH=600
+    tamano_celda = WIDTH // columnas   # 600 // 8 = 75px
+
+    # ── 1. Panel superior (información) ────────────────────────
+    pygame.draw.rect(screen, WHITE, (0, 0, WIDTH, TABLERO_Y))
+
+    # Título con algoritmo activo
+    color_titulo = GREEN if encontrado else BLUE
+    titulo = font_title.render(mensaje, True, color_titulo)
+    screen.blit(titulo, (WIDTH//2 - titulo.get_width()//2, 15))
+
+    # Contador de pasos y visitados
+    info = font_info.render(
+        f"Pasos: {pasos}  |  Visitados: {len(visitados)}", True, BLACK
+    )
+    screen.blit(info, (WIDTH//2 - info.get_width()//2, 60))
+
+    # ── 2. Dibujar el grid celda por celda ─────────────────────
+    for fila in range(filas):
+        for col in range(columnas):
+            celda    = mapa[fila][col]
+            pos      = (fila, col)
+            rect     = pygame.Rect(
+                col  * tamano_celda,
+                TABLERO_Y + fila * tamano_celda,
+                tamano_celda,
+                tamano_celda
+            )
+
+            # ── Determinar color de fondo ───────────────────────
+            # Prioridad: camino > actual > frontera > visitado > tipo celda
+            if pos in camino:
+                color_fondo = GREEN
+            elif pos == pos_actual:
+                color_fondo = ORANGE
+            elif pos in frontera:
+                color_fondo = YELLOW
+            elif pos in visitados:
+                color_fondo = LIGHT_BLUE
+            elif celda == 'H':
+                color_fondo = DARK_RED
+            elif celda == 'S':
+                color_fondo = GREEN
+            elif celda == 'G':
+                color_fondo = GOLD
+            else:
+                color_fondo = WHITE
+
+            # Dibujar fondo de celda
+            pygame.draw.rect(screen, color_fondo, rect)
+            # Borde de celda
+            pygame.draw.rect(screen, DARK_GRAY, rect, 1)
+
+            # ── Dibujar letra de la celda ───────────────────────
+            if celda in ('S', 'G', 'H'):
+                color_letra = WHITE if celda == 'H' else BLACK
+                letra = font_info.render(celda, True, color_letra)
+                screen.blit(
+                    letra,
+                    (rect.centerx - letra.get_width()  // 2,
+                     rect.centery - letra.get_height() // 2)
+                )
+
+    # ── 3. Separador visual ─────────────────────────────────────
+    pygame.draw.line(
+        screen, BLACK,
+        (0, TABLERO_Y + filas * tamano_celda),
+        (WIDTH, TABLERO_Y + filas * tamano_celda),
+        2
+    )
+
 
 # --- BUCLE PRINCIPAL ---
 def main():
@@ -154,6 +260,18 @@ def main():
                         except StopIteration:
                             pass
                     
+                    # Conexion no informado con algoritmos BFS y DFS
+                    if problema_seleccionado == "Frozen Lake (No Informada)":
+                        problema = FrozenLake()
+                        if algoritmo_seleccionado == "BFS (Anchura)":
+                            generador_algoritmo = bfs(problema)
+                        elif algoritmo_seleccionado == "DFS (Profundidad)":
+                            generador_algoritmo = dfs(problema)
+
+                        try:
+                            estado_actual = next(generador_algoritmo)
+                        except StopIteration:
+                            pass
                     estado = "VISUALIZACION"
                 y_offset += 80
                 
@@ -191,12 +309,40 @@ def main():
                             estado_actual = next(generador_algoritmo)
                         except StopIteration:
                             pass
-
                 # Botón de Volver (Derecha)
                 btn_back = dibujar_boton(screen, font_button, "Volver al Menú", 340, HEIGHT - 45, 200, 35, mouse_pos)
                 if btn_back.collidepoint(mouse_pos) and click:
                     estado = "MENU_PROBLEMA"
-
+ 
+            # ── Frozen Lake ────────────────────────
+            elif problema_seleccionado == "Frozen Lake (No Informada)":
+                dibujar_frozen_lake(screen, estado_actual, font_info, font_title)
+ 
+                if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
+                    try:
+                        estado_actual = next(generador_algoritmo)
+                        ultimo_paso_tiempo = tiempo_actual
+                    except StopIteration:
+                        generador_algoritmo = None
+ 
+                pygame.draw.rect(screen, WHITE, (0, HEIGHT - 60, WIDTH, 60))
+ 
+                btn_retry = dibujar_boton(screen, font_button, "Reintentar", 60, HEIGHT - 45, 200, 35, mouse_pos)
+                if btn_retry.collidepoint(mouse_pos) and click:
+                    problema = FrozenLake()
+                    if algoritmo_seleccionado == "BFS (Anchura)":
+                        generador_algoritmo = bfs(problema)
+                    elif algoritmo_seleccionado == "DFS (Profundidad)":
+                        generador_algoritmo = dfs(problema)
+                    try:
+                        estado_actual = next(generador_algoritmo)
+                        ultimo_paso_tiempo = tiempo_actual
+                    except StopIteration:
+                        pass
+ 
+                btn_back = dibujar_boton(screen, font_button, "Volver al Menú", 340, HEIGHT - 45, 200, 35, mouse_pos)
+                if btn_back.collidepoint(mouse_pos) and click:
+                    estado = "MENU_PROBLEMA"
         pygame.display.flip()
         clock.tick(30)
 
