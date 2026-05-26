@@ -24,20 +24,20 @@ BLUE = (50, 150, 255)
 GREEN = (50, 200, 50)
 RED = (255, 50, 50)
 
-MENU_DATA = {
-    "Frozen Lake (No Informada)": ["BFS (Anchura)", "DFS (Profundidad)"],
-    "Sokoban (Informada)": ["A-Estrella (A*)", "Voraz (Greedy)"],
-    "8 Reinas (Local)": ["Hill Climbing", "Recocido Simulado"],
-    "Gato (Adversaria)": ["Minimax", "Poda Alfa-Beta"]
-}
-
-
 # -- Configuracion visual - No informado 
 LIGHT_BLUE  = (100, 180, 255)   # Celdas visitadas
 YELLOW      = (255, 230, 100)   # Frontera activa
 ORANGE      = (255, 140,   0)   # Nodo actual
 DARK_RED    = (180,  50,  50)   # Hoyos
 GOLD        = (255, 200,   0)   # Meta
+
+
+MENU_DATA = {
+    "Frozen Lake (No Informada)": ["BFS (Anchura)", "DFS (Profundidad)"],
+    "Sokoban (Informada)": ["A-Estrella (A*)", "Voraz (Greedy)"],
+    "8 Reinas (Local)": ["Hill Climbing", "Recocido Simulado"],
+    "Gato (Adversaria)": ["Minimax", "Poda Alfa-Beta"]
+}
 
 
 # --- FUNCIONES DE INTERFAZ ---
@@ -87,15 +87,64 @@ def dibujar_reinas(screen, state_dict, font_info, font_title, imagen_reina):
     # Separador visual
     pygame.draw.line(screen, BLACK, (0, TABLERO_Y + 600), (WIDTH, TABLERO_Y + 600), 2)
 
-# -- Funciones de visualización para algoritmos no informados (BFS, DFS) ---
-def dibujar_frozen_lake(screen, estado_dict, font_info, font_title):
+def cargar_sprites_frozen_lake(tamano_celda):
     """
-    Dibuja el laberinto Frozen Lake con su estado visual actual.
-    Recibe el diccionario que yieldeó el algoritmo.
+    Carga y escala todos los sprites de Frozen Lake desde assets/uninformed/.
+    Retorna un diccionario con los sprites listos para usar.
+    Si algún archivo falla, retorna None para ese sprite (habrá fallback con colores).
+    """
+    ruta_base = os.path.join("assets", "uninformed")
+    sprites   = {}
+ 
+    archivos = {
+        "ice":        "ice.png",
+        "hole":       "hole.png",
+        "goal":       "stool.png",    # stool = el regalo/banquito como meta
+        "elf_down":   "elf_down.png",
+        "elf_up":     "elf_up.png",
+        "elf_left":   "elf_left.png",
+        "elf_right":  "elf_right.png",
+    }
+ 
+    for clave, archivo in archivos.items():
+        try:
+            ruta    = os.path.join(ruta_base, archivo)
+            imagen  = pygame.image.load(ruta).convert_alpha()
+            sprites[clave] = pygame.transform.scale(imagen, (tamano_celda, tamano_celda))
+        except (pygame.error, FileNotFoundError):
+            print(f"Aviso: No se pudo cargar '{archivo}'. Usando color de respaldo.")
+            sprites[clave] = None
+ 
+    return sprites
+ 
+ 
+def dibujar_celda_con_overlay(screen, rect, color_overlay, alpha=120):
+    """
+    Dibuja un rectángulo semitransparente encima de una celda.
+    Esto permite ver el sprite de fondo Y el color del estado del algoritmo.
+    
+    alpha = 0   → totalmente transparente (no se ve)
+    alpha = 255 → totalmente opaco (tapa el sprite)
+    alpha = 120 → semitransparente (efecto tinte sobre el sprite)
+    """
+    overlay = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    overlay.fill((*color_overlay, alpha))
+    screen.blit(overlay, rect.topleft)
+ 
+ 
+def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
+    """
+    Dibuja el laberinto Frozen Lake con sprites de Gymnasium.
+    
+    Capas de dibujo por celda (de abajo hacia arriba):
+      1. Sprite ice.png        → fondo de toda celda
+      2. Sprite hole/goal      → si la celda es H o G
+      3. Overlay semitransparente → color del estado del algoritmo
+      4. Sprite del elfo       → encima de pos_actual
     """
     if not estado_dict or "mapa" not in estado_dict:
         return
-
+ 
     mapa       = estado_dict["mapa"]
     visitados  = estado_dict["visitados"]
     frontera   = estado_dict["frontera"]
@@ -104,81 +153,96 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title):
     encontrado = estado_dict["encontrado"]
     pasos      = estado_dict["pasos"]
     mensaje    = estado_dict["mensaje"]
-
-    filas    = len(mapa)
-    columnas = len(mapa[0])
-
-    # Tamaño de cada celda para que el grid quepa en WIDTH=600
-    tamano_celda = WIDTH // columnas   # 600 // 8 = 75px
-
-    # ── 1. Panel superior (información) ────────────────────────
+ 
+    filas        = len(mapa)
+    columnas     = len(mapa[0])
+    tamano_celda = WIDTH // columnas    # 75px para 8 columnas
+ 
+    # ── 1. Panel superior ─────────────────────────────────────
     pygame.draw.rect(screen, WHITE, (0, 0, WIDTH, TABLERO_Y))
-
-    # Título con algoritmo activo
     color_titulo = GREEN if encontrado else BLUE
     titulo = font_title.render(mensaje, True, color_titulo)
     screen.blit(titulo, (WIDTH//2 - titulo.get_width()//2, 15))
-
-    # Contador de pasos y visitados
     info = font_info.render(
         f"Pasos: {pasos}  |  Visitados: {len(visitados)}", True, BLACK
     )
     screen.blit(info, (WIDTH//2 - info.get_width()//2, 60))
-
-    # ── 2. Dibujar el grid celda por celda ─────────────────────
+ 
+    # ── 2. Grid celda por celda ───────────────────────────────
     for fila in range(filas):
         for col in range(columnas):
-            celda    = mapa[fila][col]
-            pos      = (fila, col)
-            rect     = pygame.Rect(
+            celda = mapa[fila][col]
+            pos   = (fila, col)
+            rect  = pygame.Rect(
                 col  * tamano_celda,
                 TABLERO_Y + fila * tamano_celda,
                 tamano_celda,
                 tamano_celda
             )
-
-            # ── Determinar color de fondo ───────────────────────
-            # Prioridad: camino > actual > frontera > visitado > tipo celda
-            if pos in camino:
-                color_fondo = GREEN
-            elif pos == pos_actual:
-                color_fondo = ORANGE
-            elif pos in frontera:
-                color_fondo = YELLOW
-            elif pos in visitados:
-                color_fondo = LIGHT_BLUE
-            elif celda == 'H':
-                color_fondo = DARK_RED
-            elif celda == 'S':
-                color_fondo = GREEN
-            elif celda == 'G':
-                color_fondo = GOLD
+ 
+            # ── CAPA 1: Fondo de hielo (siempre) ─────────────
+            if sprites.get("ice"):
+                screen.blit(sprites["ice"], rect.topleft)
             else:
-                color_fondo = WHITE
-
-            # Dibujar fondo de celda
-            pygame.draw.rect(screen, color_fondo, rect)
-            # Borde de celda
+                pygame.draw.rect(screen, WHITE, rect)
+ 
+            # ── CAPA 2: Sprite específico de la celda ─────────
+            if celda == 'H':
+                if sprites.get("hole"):
+                    screen.blit(sprites["hole"], rect.topleft)
+                else:
+                    pygame.draw.rect(screen, DARK_RED, rect)
+ 
+            elif celda == 'G':
+                if sprites.get("goal"):
+                    screen.blit(sprites["goal"], rect.topleft)
+                else:
+                    pygame.draw.rect(screen, GOLD, rect)
+ 
+            # ── CAPA 3: Overlay de color según estado ─────────
+            # Solo en celdas que NO son hoyos (para verlos siempre claros)
+            if celda != 'H':
+                if pos in camino:
+                    dibujar_celda_con_overlay(screen, rect, GREEN,      alpha=140)
+                elif pos == pos_actual:
+                    dibujar_celda_con_overlay(screen, rect, ORANGE,     alpha=160)
+                elif pos in frontera:
+                    dibujar_celda_con_overlay(screen, rect, YELLOW,     alpha=130)
+                elif pos in visitados:
+                    dibujar_celda_con_overlay(screen, rect, LIGHT_BLUE, alpha=110)
+ 
+            # ── CAPA 4: Borde de celda ────────────────────────
             pygame.draw.rect(screen, DARK_GRAY, rect, 1)
-
-            # ── Dibujar letra de la celda ───────────────────────
-            if celda in ('S', 'G', 'H'):
-                color_letra = WHITE if celda == 'H' else BLACK
-                letra = font_info.render(celda, True, color_letra)
-                screen.blit(
-                    letra,
-                    (rect.centerx - letra.get_width()  // 2,
-                     rect.centery - letra.get_height() // 2)
-                )
-
-    # ── 3. Separador visual ─────────────────────────────────────
-    pygame.draw.line(
-        screen, BLACK,
-        (0, TABLERO_Y + filas * tamano_celda),
-        (WIDTH, TABLERO_Y + filas * tamano_celda),
-        2
-    )
-
+ 
+            # ── CAPA 5: Elfo encima del nodo actual ───────────
+            if pos == pos_actual:
+                sprite_elfo = sprites.get("elf_down")   # Por defecto mirando abajo
+                if sprite_elfo:
+                    screen.blit(sprite_elfo, rect.topleft)
+                else:
+                    # Fallback: círculo naranja
+                    pygame.draw.circle(screen, ORANGE, rect.center, tamano_celda // 3)
+ 
+    # ── 3. Separador visual ───────────────────────────────────
+    linea_y = TABLERO_Y + filas * tamano_celda
+    pygame.draw.line(screen, BLACK, (0, linea_y), (WIDTH, linea_y), 2)
+ 
+    # ── 4. Leyenda de colores ─────────────────────────────────
+    font_leyenda = pygame.font.SysFont(None, 20)
+    leyenda = [
+        (GREEN,      "Camino"),
+        (ORANGE,     "Actual"),
+        (YELLOW,     "Frontera"),
+        (LIGHT_BLUE, "Visitado"),
+    ]
+    x_ley = 8
+    y_ley = linea_y + 8
+    for color_ley, texto_ley in leyenda:
+        pygame.draw.rect(screen, color_ley,  (x_ley,      y_ley, 14, 14))
+        pygame.draw.rect(screen, DARK_GRAY,  (x_ley,      y_ley, 14, 14), 1)
+        etiqueta = font_leyenda.render(texto_ley, True, BLACK)
+        screen.blit(etiqueta, (x_ley + 17, y_ley))
+        x_ley += 85
 
 # --- BUCLE PRINCIPAL ---
 def main():
@@ -199,6 +263,11 @@ def main():
     except (pygame.error, FileNotFoundError):
         print("Aviso: No se encontró 'assets/reina.png'. Usando círculos por defecto.")
 
+    # Cargar sprites de Frozen Lake
+    tamano_celda_fl = WIDTH // 8   # 75px
+    sprites_fl      = cargar_sprites_frozen_lake(tamano_celda_fl)
+
+    #Variables de estado 
     estado = "MENU_PROBLEMA"
     problema_seleccionado = None
     algoritmo_seleccionado = None
@@ -316,7 +385,8 @@ def main():
  
             # ── Frozen Lake ────────────────────────
             elif problema_seleccionado == "Frozen Lake (No Informada)":
-                dibujar_frozen_lake(screen, estado_actual, font_info, font_title)
+                # Pasar sprites a la función de dibujo
+                dibujar_frozen_lake(screen, estado_actual, font_info, font_title, sprites_fl)
  
                 if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
                     try:
@@ -327,7 +397,8 @@ def main():
  
                 pygame.draw.rect(screen, WHITE, (0, HEIGHT - 60, WIDTH, 60))
  
-                btn_retry = dibujar_boton(screen, font_button, "Reintentar", 60, HEIGHT - 45, 200, 35, mouse_pos)
+                btn_retry = dibujar_boton(screen, font_button, "Reintentar",
+                                          60, HEIGHT - 45, 200, 35, mouse_pos)
                 if btn_retry.collidepoint(mouse_pos) and click:
                     problema = FrozenLake()
                     if algoritmo_seleccionado == "BFS (Anchura)":
@@ -340,9 +411,11 @@ def main():
                     except StopIteration:
                         pass
  
-                btn_back = dibujar_boton(screen, font_button, "Volver al Menú", 340, HEIGHT - 45, 200, 35, mouse_pos)
+                btn_back = dibujar_boton(screen, font_button, "Volver al Menú",
+                                         340, HEIGHT - 45, 200, 35, mouse_pos)
                 if btn_back.collidepoint(mouse_pos) and click:
                     estado = "MENU_PROBLEMA"
+
         pygame.display.flip()
         clock.tick(30)
 
