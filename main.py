@@ -100,7 +100,9 @@ def main():
     generador_algoritmo = None
     estado_actual = None
     ultimo_paso_tiempo = 0
-    tiempo_entre_pasos = 0.8  # Un poco más rápido para dar dinamismo
+    tiempo_entre_pasos = 0.8  
+    iteracion_actual = 0
+    limite_impresiones = 5
 
     running = True
     while running:
@@ -148,7 +150,17 @@ def main():
                             generador_algoritmo = hill_climbing(problema)
                         elif algoritmo_seleccionado == "Recocido Simulado":
                             generador_algoritmo = simulated_annealing(problema)
-                            
+                        print(f"\nHas seleccionado {algoritmo_seleccionado}.")   
+                        try:
+                            entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
+                            limite_impresiones = int(entrada)
+                            if limite_impresiones <= 0: limite_impresiones = 1
+                        except ValueError:
+                            print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
+                            limite_impresiones = 5
+                        iteracion_actual = 0
+                        print("\n--- Iniciando Búsqueda ---")
+
                         try:
                             estado_actual = next(generador_algoritmo)
                         except StopIteration:
@@ -170,8 +182,15 @@ def main():
                     try:
                         estado_actual = next(generador_algoritmo)
                         ultimo_paso_tiempo = tiempo_actual
+                        iteracion_actual += 1
+                        if iteracion_actual <= limite_impresiones:
+                            print(f"Iteración: {iteracion_actual} | Costo (Ataques): {estado_actual['ataques']} | Estado: {estado_actual['mensaje']}")
+                        elif iteracion_actual == limite_impresiones + 1:
+                            print(f"... (Se han mostrado las primeras {limite_impresiones} iteraciones. Observa el resto en la interfaz gráfica) ...")
                     except StopIteration:
                         generador_algoritmo = None
+                        print(f"--- Búsqueda finalizada en la iteración {iteracion_actual} ---")
+                        iteracion_actual = 0
 
                 # --- 3. DIBUJAR PANEL INFERIOR Y BOTONES ---
                 # Fondo del panel inferior
