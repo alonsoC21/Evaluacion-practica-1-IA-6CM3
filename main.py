@@ -7,9 +7,13 @@ import os
 from environments.eight_queens import EightQueens
 from algorithms.local import hill_climbing, simulated_annealing
 
-# --- Imports: No informado 
+# --- Imports: No informado
 from environments.frozen_lake import FrozenLake
 from algorithms.uninformed import bfs, dfs
+
+# --- Imports: Informado ---
+from environments.sokoban import Sokoban
+from algorithms.informed import a_star, greedy
 
 # --- Imports: Adversaria ---
 from environments.gato import TicTacToe
@@ -255,6 +259,95 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
         screen.blit(etiqueta, (x_ley + 17, y_ley))
         x_ley += 85
 
+# --- Dibujar Tablero de Sokoban ---
+def dibujar_sokoban(screen, estado_dict, font_info, font_title):
+    if not estado_dict or "nivel" not in estado_dict:
+        return
+
+    nivel      = estado_dict["nivel"]
+    jugador    = estado_dict["jugador"]
+    cajas      = estado_dict["cajas"]
+    metas      = estado_dict["metas"]
+    visitados  = estado_dict["visitados"]
+    frontera   = estado_dict["frontera"]
+    costo      = estado_dict["costo"]
+    heuristica = estado_dict["heuristica"]
+    encontrado = estado_dict["encontrado"]
+    mensaje    = estado_dict["mensaje"]
+
+    FILAS    = len(nivel)
+    COLUMNAS = len(nivel[0])
+
+    # Colores propios de Sokoban
+    COL_WALL   = (60,  60,  60)
+    COL_FLOOR  = (220, 215, 200)
+    COL_GOAL   = (255, 200,  80)
+    COL_BOX    = (160,  90,  20)
+    COL_BOX_OK = (50,  180,  50)
+    COL_PLAYER = (50,  100, 220)
+
+    # Tamaño de celda: cabe en el ancho y en la zona de tablero disponible
+    tam      = min(WIDTH // COLUMNAS, (HEIGHT - TABLERO_Y - 70) // FILAS)
+    margen_x = (WIDTH - COLUMNAS * tam) // 2
+    margen_y = TABLERO_Y
+
+    # 1. Panel superior
+    pygame.draw.rect(screen, WHITE, (0, 0, WIDTH, TABLERO_Y))
+    color_msg = GREEN if encontrado else BLUE
+    txt_msg   = font_title.render(mensaje, True, color_msg)
+    screen.blit(txt_msg, (WIDTH // 2 - txt_msg.get_width() // 2, 12))
+
+    txt_g = font_info.render(f"g(n): {costo}", True, BLACK)
+    txt_h = font_info.render(f"h(n): {heuristica}", True, BLACK)
+    txt_v = font_info.render(f"Visitados: {visitados}", True, BLACK)
+    txt_f = font_info.render(f"Frontera: {frontera}", True, BLACK)
+    screen.blit(txt_g, (20, 52))
+    screen.blit(txt_h, (WIDTH - txt_h.get_width() - 20, 52))
+    screen.blit(txt_v, (20, 76))
+    screen.blit(txt_f, (WIDTH - txt_f.get_width() - 20, 76))
+
+    # 2. Dibujar cada celda del grid
+    for r in range(FILAS):
+        for c in range(COLUMNAS):
+            celda = nivel[r][c]
+            pos   = (r, c)
+            rect  = pygame.Rect(
+                margen_x + c * tam,
+                margen_y + r * tam,
+                tam, tam
+            )
+
+            # Fondo de celda
+            if celda == '#':
+                pygame.draw.rect(screen, COL_WALL, rect)
+            elif celda == '.':
+                pygame.draw.rect(screen, COL_GOAL, rect)
+            else:
+                pygame.draw.rect(screen, COL_FLOOR, rect)
+
+            # Caja (normal o sobre meta)
+            if pos in cajas:
+                color_caja  = COL_BOX_OK if pos in metas else COL_BOX
+                mg          = tam // 8
+                rect_caja   = pygame.Rect(rect.x + mg, rect.y + mg,
+                                          tam - 2 * mg, tam - 2 * mg)
+                pygame.draw.rect(screen, color_caja, rect_caja, border_radius=4)
+                pygame.draw.rect(screen, BLACK, rect_caja, 2, border_radius=4)
+
+            # Jugador
+            if pos == jugador:
+                pygame.draw.circle(screen, COL_PLAYER, rect.center, tam // 3)
+                pygame.draw.circle(screen, BLACK,      rect.center, tam // 3, 2)
+
+            # Borde de celda no-pared
+            if celda != '#':
+                pygame.draw.rect(screen, DARK_GRAY, rect, 1)
+
+    # Separador visual inferior
+    linea_y = margen_y + FILAS * tam
+    pygame.draw.line(screen, BLACK, (0, linea_y), (WIDTH, linea_y), 2)
+
+
 # --- BUCLE PRINCIPAL ---
 def main():
     pygame.init()
@@ -345,7 +438,15 @@ def main():
                         elif algoritmo_seleccionado == "DFS (Profundidad)":
                             generador_algoritmo = dfs(problema)
                             
-                    # 3. Preparación para Gato (Adversaria)
+                    # 3. Preparación para Sokoban (Informada)
+                    elif problema_seleccionado == "Sokoban (Informada)":
+                        problema = Sokoban()
+                        if algoritmo_seleccionado == "A-Estrella (A*)":
+                            generador_algoritmo = a_star(problema)
+                        elif algoritmo_seleccionado == "Voraz (Greedy)":
+                            generador_algoritmo = greedy(problema)
+
+                    # 4. Preparación para Gato (Adversaria)
                     elif problema_seleccionado == "Gato (Adversaria)":
                         problema = TicTacToe()
                         if algoritmo_seleccionado == "Poda Alfa-Beta":
@@ -417,6 +518,28 @@ def main():
                         print(f"--- Búsqueda finalizada ---")
                         iteracion_actual = 0
                         
+            elif problema_seleccionado == "Sokoban (Informada)":
+                dibujar_sokoban(screen, estado_actual, font_info, font_title)
+
+                if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
+                    try:
+                        estado_actual = next(generador_algoritmo)
+                        ultimo_paso_tiempo = tiempo_actual
+                        iteracion_actual += 1
+
+                        if iteracion_actual <= limite_impresiones:
+                            g  = estado_actual['costo']
+                            h  = estado_actual['heuristica']
+                            print(f"Iteración: {iteracion_actual} | g={g} | h={h} | f={g + h} | Visitados: {estado_actual['visitados']}")
+                            print(f"  Estado: {estado_actual['mensaje']}")
+                        elif iteracion_actual == limite_impresiones + 1:
+                            print(f"... (Se han mostrado las {limite_impresiones} iteraciones. Observa la interfaz gráfica) ...")
+
+                    except StopIteration:
+                        generador_algoritmo = None
+                        print(f"--- Búsqueda finalizada en la iteración {iteracion_actual} ---")
+                        iteracion_actual = 0
+
             elif problema_seleccionado == "Gato (Adversaria)":
                 dibujar_gato(screen, estado_actual, font_info, font_title)
                 
@@ -465,6 +588,12 @@ def main():
                         generador_algoritmo = bfs(problema)
                     elif algoritmo_seleccionado == "DFS (Profundidad)":
                         generador_algoritmo = dfs(problema)
+                elif problema_seleccionado == "Sokoban (Informada)":
+                    problema = Sokoban()
+                    if algoritmo_seleccionado == "A-Estrella (A*)":
+                        generador_algoritmo = a_star(problema)
+                    elif algoritmo_seleccionado == "Voraz (Greedy)":
+                        generador_algoritmo = greedy(problema)
                 elif problema_seleccionado == "Gato (Adversaria)":
                     problema = TicTacToe()
                     if algoritmo_seleccionado == "Poda Alfa-Beta":
