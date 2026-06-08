@@ -91,7 +91,7 @@ def dibujar_reinas(screen, state_dict, font_info, font_title, imagen_reina):
     # Separador visual
     pygame.draw.line(screen, BLACK, (0, TABLERO_Y + 600), (WIDTH, TABLERO_Y + 600), 2)
 
-# --- NUEVA FUNCIÓN: Dibujar Tablero de Gato ---
+# ---Dibujar Tablero de Gato ---
 def dibujar_gato(screen, state_dict, font_info, font_title):
     if not state_dict or "tablero" not in state_dict:
         return
@@ -287,7 +287,7 @@ def main():
     ultimo_paso_tiempo = 0
     tiempo_entre_pasos = 0.8  
     iteracion_actual = 0
-    limite_impresiones = 5
+    limite_impresiones = 0
 
     running = True
     while running:
