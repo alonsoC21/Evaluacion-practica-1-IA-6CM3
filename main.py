@@ -342,12 +342,25 @@ def main():
                             pass
                     
                     # Conexion no informado con algoritmos BFS y DFS
-                    if problema_seleccionado == "Frozen Lake (No Informada)":
+                    elif problema_seleccionado == "Frozen Lake (No Informada)":
                         problema = FrozenLake()
                         if algoritmo_seleccionado == "BFS (Anchura)":
                             generador_algoritmo = bfs(problema)
                         elif algoritmo_seleccionado == "DFS (Profundidad)":
                             generador_algoritmo = dfs(problema)
+
+                        # ── Pregunta en terminal ──────────────────────
+                        print(f"\nHas seleccionado {algoritmo_seleccionado}.")
+                        try:
+                            entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
+                            limite_impresiones = int(entrada)
+                            if limite_impresiones <= 0: limite_impresiones = 1
+                        except ValueError:
+                            print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
+                            limite_impresiones = 5
+                        iteracion_actual = 0
+                        print("\n--- Iniciando Búsqueda ---")
+                        # ─────────────────────────────────────────────
 
                         try:
                             estado_actual = next(generador_algoritmo)
@@ -370,6 +383,7 @@ def main():
                         estado_actual = next(generador_algoritmo)
                         ultimo_paso_tiempo = tiempo_actual
                         iteracion_actual += 1
+
                         if iteracion_actual <= limite_impresiones:
                             print(f"Iteración: {iteracion_actual} | Costo (Ataques): {estado_actual['ataques']} | Estado: {estado_actual['mensaje']}")
                         elif iteracion_actual == limite_impresiones + 1:
@@ -411,6 +425,55 @@ def main():
                     try:
                         estado_actual = next(generador_algoritmo)
                         ultimo_paso_tiempo = tiempo_actual
+                        iteracion_actual += 1
+
+                        if iteracion_actual <= limite_impresiones:
+                            es_bfs          = algoritmo_seleccionado == "BFS (Anchura)"
+                            nombre_frontera = "Cola" if es_bfs else "Pila"
+                            frontera        = estado_actual['frontera']
+                            visitados_log   = sorted(estado_actual['visitados'])
+                            vecinos_log     = estado_actual['vecinos']
+                            pos             = estado_actual['pos_actual']
+
+                            print(f"╔{'═'*50}╗")
+                            print(f"║  Iteración: {iteracion_actual}")
+                            print(f"║  Acción:    Expandiendo nodo {pos}")
+                            print(f"║  {nombre_frontera}:{'':6}{frontera}")
+                            print(f"║  Visitados: {visitados_log}")
+                            print(f"║  Vecinos nuevos encontrados: {len(vecinos_log)}")
+                            print(f"║  Detalle vecinos: {', '.join(str(v) for v in vecinos_log)}")
+                            print(f"╚{'═'*50}╝")
+
+                            # Caso 1: El algoritmo encontró la meta ANTES de agotar el límite
+                            if estado_actual.get('encontrado'):
+                                print(f"{'═'*52}")
+                                print(f"  META ALCANZADA en iteración {iteracion_actual}")
+                                print(f"  Longitud del camino: {len(estado_actual['camino'])} pasos")
+                                print(f"  Total visitados:     {len(estado_actual['visitados'])}")
+                                print(f"{'═'*52}")
+
+                        elif iteracion_actual == limite_impresiones + 1:
+                            # Caso 2: Se agotaron las iteraciones del usuario
+                            print(f"╔{'═'*50}╗")
+                            print(f"║  Se han mostrado las primeras {limite_impresiones} iteraciones.")
+                            print(f"║  Puedes seguir viendo el progreso en la interfaz gráfica.")
+                            print(f"╚{'═'*50}╝")
+
+                    except StopIteration:
+                        generador_algoritmo = None
+                        # Caso 1 cuando termina DESPUÉS del límite de impresiones
+                        if estado_actual and estado_actual.get('encontrado'):
+                            print(f"{'═'*52}")
+                            print(f"  META ALCANZADA en iteración {iteracion_actual}")
+                            print(f"  Longitud del camino: {len(estado_actual['camino'])} pasos")
+                            print(f"  Total visitados:     {len(estado_actual['visitados'])}")
+                            print(f"{'═'*52}")
+                        else:
+                            print(f"{'═'*52}")
+                            print(f"  No se encontró solución.")
+                            print(f"  Total iteraciones: {iteracion_actual}")
+                            print(f"{'═'*52}")
+                        iteracion_actual = 0
                     except StopIteration:
                         generador_algoritmo = None
  
@@ -424,6 +487,19 @@ def main():
                         generador_algoritmo = bfs(problema)
                     elif algoritmo_seleccionado == "DFS (Profundidad)":
                         generador_algoritmo = dfs(problema)
+
+                    # ── Pregunta en terminal ──────────────────
+                    print(f"\nHas seleccionado {algoritmo_seleccionado}.")
+                    try:
+                        entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
+                        limite_impresiones = int(entrada)
+                        if limite_impresiones <= 0: limite_impresiones = 1
+                    except ValueError:
+                        print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
+                        limite_impresiones = 5
+                    iteracion_actual = 0
+                    print("\n--- Iniciando Búsqueda ---")
+                    # ─────────────────────────────────────────────────
                     try:
                         estado_actual = next(generador_algoritmo)
                         ultimo_paso_tiempo = tiempo_actual

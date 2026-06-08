@@ -1,2 +1,14 @@
 __pycache__/
 *.pyc
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

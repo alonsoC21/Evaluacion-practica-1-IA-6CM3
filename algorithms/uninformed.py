@@ -16,7 +16,7 @@ def _reconstruir_camino(padres, meta):
 
 
 def _estado_visual(mapa, visitados, frontera, pos_actual,
-                   camino, encontrado, pasos, mensaje):
+                   camino, encontrado, pasos, mensaje, vecinos=None):
     """
     Función auxiliar que empaqueta todos los datos visuales
     en un diccionario limpio.
@@ -30,6 +30,7 @@ def _estado_visual(mapa, visitados, frontera, pos_actual,
         "encontrado": encontrado,
         "pasos":      pasos,
         "mensaje":    mensaje,
+        "vecinos": list(vecinos) if vecinos else [],
     }
 
 
@@ -68,6 +69,12 @@ def bfs(problema):
 
         visitados.add(pos_actual)
 
+        # Calcular vecinos ANTES del yield para incluirlos en el estado
+        vecinos_nuevos = [
+            v for v in problema.get_neighbors(pos_actual)
+            if v not in visitados and v not in padres
+        ]
+
         # ── Yield: mostrar estado actual en pantalla
         yield _estado_visual(
             mapa       = mapa,
@@ -77,7 +84,8 @@ def bfs(problema):
             camino     = [],
             encontrado = False,
             pasos      = pasos,
-            mensaje    = f"BFS: Explorando {pos_actual}..."
+            mensaje    = f"BFS: Explorando {pos_actual}...",
+            vecinos = vecinos_nuevos,
         )
 
         # ¿Llego a la meta?
