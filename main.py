@@ -11,7 +11,7 @@ from algorithms.local import hill_climbing, simulated_annealing
 from environments.frozen_lake import FrozenLake
 from algorithms.uninformed import bfs, dfs
 
-# --- NUEVOS Imports: Adversaria ---
+# --- Imports: Adversaria ---
 from environments.gato import TicTacToe
 from algorithms.adversarial import alpha_beta_pruning
 
