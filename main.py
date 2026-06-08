@@ -3,13 +3,17 @@ import sys
 import time
 import os
 
-from environments.eight_queens import EightQueens
+# --- Imports: Local
 from environments.eight_queens import EightQueens
 from algorithms.local import hill_climbing, simulated_annealing
 
 # --- Imports: No informado 
 from environments.frozen_lake import FrozenLake
 from algorithms.uninformed import bfs, dfs
+
+# --- NUEVOS Imports: Adversaria ---
+from environments.gato import TicTacToe
+from algorithms.adversarial import alpha_beta_pruning
 
 # --- CONFIGURACIÓN VISUAL ---
 WIDTH = 600
@@ -36,7 +40,7 @@ MENU_DATA = {
     "Frozen Lake (No Informada)": ["BFS (Anchura)", "DFS (Profundidad)"],
     "Sokoban (Informada)": ["A-Estrella (A*)", "Voraz (Greedy)"],
     "8 Reinas (Local)": ["Hill Climbing", "Recocido Simulado"],
-    "Gato (Adversaria)": ["Minimax", "Poda Alfa-Beta"]
+    "Gato (Adversaria)": ["Poda Alfa-Beta"] # Cambiamos temporalmente para forzar alfa-beta
 }
 
 
@@ -87,19 +91,56 @@ def dibujar_reinas(screen, state_dict, font_info, font_title, imagen_reina):
     # Separador visual
     pygame.draw.line(screen, BLACK, (0, TABLERO_Y + 600), (WIDTH, TABLERO_Y + 600), 2)
 
+# --- NUEVA FUNCIÓN: Dibujar Tablero de Gato ---
+def dibujar_gato(screen, state_dict, font_info, font_title):
+    if not state_dict or "tablero" not in state_dict:
+        return
+
+    tablero = state_dict["tablero"]
+    
+    # 1. Panel Superior (Alfa, Beta y Mensaje)
+    pygame.draw.rect(screen, WHITE, (0, 0, WIDTH, TABLERO_Y))
+    texto_msg = font_title.render(state_dict['mensaje'], True, BLACK)
+    screen.blit(texto_msg, (WIDTH//2 - texto_msg.get_width()//2, 15))
+    
+    texto_alfa = font_info.render(f"Alfa (\u03B1): {state_dict.get('alfa', '-')}", True, BLUE)
+    texto_beta = font_info.render(f"Beta (\u03B2): {state_dict.get('beta', '-')}", True, RED)
+    screen.blit(texto_alfa, (40, 60))
+    screen.blit(texto_beta, (WIDTH - 40 - texto_beta.get_width(), 60))
+
+    # 2. Dibujar Tablero 3x3 Centrado
+    tamano_celda = 150
+    margen_x = (WIDTH - (3 * tamano_celda)) // 2
+    margen_y = TABLERO_Y + 60
+
+    for row in range(3):
+        for col in range(3):
+            idx = row * 3 + col
+            rect = pygame.Rect(margen_x + col * tamano_celda, margen_y + row * tamano_celda, tamano_celda, tamano_celda)
+            
+            # Fondo blanco y bordes gruesos para que parezca gato
+            pygame.draw.rect(screen, WHITE, rect)
+            pygame.draw.rect(screen, BLACK, rect, 4)
+            
+            # Dibujar X (Azul) y O (Roja)
+            if tablero[idx] == 'X':
+                offset = 30
+                pygame.draw.line(screen, BLUE, (rect.left + offset, rect.top + offset), (rect.right - offset, rect.bottom - offset), 12)
+                pygame.draw.line(screen, BLUE, (rect.right - offset, rect.top + offset), (rect.left + offset, rect.bottom - offset), 12)
+            elif tablero[idx] == 'O':
+                pygame.draw.circle(screen, RED, rect.center, tamano_celda // 2 - 25, 10)
+
+    # Separador visual inferior
+    pygame.draw.line(screen, BLACK, (0, TABLERO_Y + 600), (WIDTH, TABLERO_Y + 600), 2)
+
 def cargar_sprites_frozen_lake(tamano_celda):
-    """
-    Carga y escala todos los sprites de Frozen Lake desde assets/uninformed/.
-    Retorna un diccionario con los sprites listos para usar.
-    Si algún archivo falla, retorna None para ese sprite (habrá fallback con colores).
-    """
     ruta_base = os.path.join("assets", "uninformed")
     sprites   = {}
  
     archivos = {
         "ice":        "ice.png",
         "hole":       "hole.png",
-        "goal":       "stool.png",    # stool = el regalo/banquito como meta
+        "goal":       "stool.png",
         "elf_down":   "elf_down.png",
         "elf_up":     "elf_up.png",
         "elf_left":   "elf_left.png",
@@ -117,31 +158,12 @@ def cargar_sprites_frozen_lake(tamano_celda):
  
     return sprites
  
- 
 def dibujar_celda_con_overlay(screen, rect, color_overlay, alpha=120):
-    """
-    Dibuja un rectángulo semitransparente encima de una celda.
-    Esto permite ver el sprite de fondo Y el color del estado del algoritmo.
-    
-    alpha = 0   → totalmente transparente (no se ve)
-    alpha = 255 → totalmente opaco (tapa el sprite)
-    alpha = 120 → semitransparente (efecto tinte sobre el sprite)
-    """
     overlay = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
     overlay.fill((*color_overlay, alpha))
     screen.blit(overlay, rect.topleft)
  
- 
 def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
-    """
-    Dibuja el laberinto Frozen Lake con sprites de Gymnasium.
-    
-    Capas de dibujo por celda (de abajo hacia arriba):
-      1. Sprite ice.png        → fondo de toda celda
-      2. Sprite hole/goal      → si la celda es H o G
-      3. Overlay semitransparente → color del estado del algoritmo
-      4. Sprite del elfo       → encima de pos_actual
-    """
     if not estado_dict or "mapa" not in estado_dict:
         return
  
@@ -156,9 +178,8 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
  
     filas        = len(mapa)
     columnas     = len(mapa[0])
-    tamano_celda = WIDTH // columnas    # 75px para 8 columnas
+    tamano_celda = WIDTH // columnas 
  
-    # ── 1. Panel superior ─────────────────────────────────────
     pygame.draw.rect(screen, WHITE, (0, 0, WIDTH, TABLERO_Y))
     color_titulo = GREEN if encontrado else BLUE
     titulo = font_title.render(mensaje, True, color_titulo)
@@ -168,7 +189,6 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
     )
     screen.blit(info, (WIDTH//2 - info.get_width()//2, 60))
  
-    # ── 2. Grid celda por celda ───────────────────────────────
     for fila in range(filas):
         for col in range(columnas):
             celda = mapa[fila][col]
@@ -180,13 +200,11 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
                 tamano_celda
             )
  
-            # ── CAPA 1: Fondo de hielo (siempre) ─────────────
             if sprites.get("ice"):
                 screen.blit(sprites["ice"], rect.topleft)
             else:
                 pygame.draw.rect(screen, WHITE, rect)
  
-            # ── CAPA 2: Sprite específico de la celda ─────────
             if celda == 'H':
                 if sprites.get("hole"):
                     screen.blit(sprites["hole"], rect.topleft)
@@ -199,8 +217,6 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
                 else:
                     pygame.draw.rect(screen, GOLD, rect)
  
-            # ── CAPA 3: Overlay de color según estado ─────────
-            # Solo en celdas que NO son hoyos (para verlos siempre claros)
             if celda != 'H':
                 if pos in camino:
                     dibujar_celda_con_overlay(screen, rect, GREEN,      alpha=140)
@@ -211,23 +227,18 @@ def dibujar_frozen_lake(screen, estado_dict, font_info, font_title, sprites):
                 elif pos in visitados:
                     dibujar_celda_con_overlay(screen, rect, LIGHT_BLUE, alpha=110)
  
-            # ── CAPA 4: Borde de celda ────────────────────────
             pygame.draw.rect(screen, DARK_GRAY, rect, 1)
  
-            # ── CAPA 5: Elfo encima del nodo actual ───────────
             if pos == pos_actual:
-                sprite_elfo = sprites.get("elf_down")   # Por defecto mirando abajo
+                sprite_elfo = sprites.get("elf_down")
                 if sprite_elfo:
                     screen.blit(sprite_elfo, rect.topleft)
                 else:
-                    # Fallback: círculo naranja
                     pygame.draw.circle(screen, ORANGE, rect.center, tamano_celda // 3)
  
-    # ── 3. Separador visual ───────────────────────────────────
     linea_y = TABLERO_Y + filas * tamano_celda
     pygame.draw.line(screen, BLACK, (0, linea_y), (WIDTH, linea_y), 2)
  
-    # ── 4. Leyenda de colores ─────────────────────────────────
     font_leyenda = pygame.font.SysFont(None, 20)
     leyenda = [
         (GREEN,      "Camino"),
@@ -250,7 +261,7 @@ def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Visualizador de Algoritmos IA")
     
-    font_title = pygame.font.SysFont(None, 40)
+    font_title = pygame.font.SysFont(None, 36)
     font_button = pygame.font.SysFont(None, 28)
     font_info = pygame.font.SysFont(None, 32)
     clock = pygame.time.Clock()
@@ -263,8 +274,7 @@ def main():
     except (pygame.error, FileNotFoundError):
         print("Aviso: No se encontró 'assets/reina.png'. Usando círculos por defecto.")
 
-    # Cargar sprites de Frozen Lake
-    tamano_celda_fl = WIDTH // 8   # 75px
+    tamano_celda_fl = WIDTH // 8
     sprites_fl      = cargar_sprites_frozen_lake(tamano_celda_fl)
 
     #Variables de estado 
@@ -319,53 +329,46 @@ def main():
                 if btn.collidepoint(mouse_pos) and click:
                     algoritmo_seleccionado = algoritmo
                     
+                    # 1. Preparación para 8 Reinas
                     if problema_seleccionado == "8 Reinas (Local)":
                         problema = EightQueens()
                         if algoritmo_seleccionado == "Hill Climbing":
                             generador_algoritmo = hill_climbing(problema)
                         elif algoritmo_seleccionado == "Recocido Simulado":
                             generador_algoritmo = simulated_annealing(problema)
-                        print(f"\nHas seleccionado {algoritmo_seleccionado}.")   
-                        try:
-                            entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
-                            limite_impresiones = int(entrada)
-                            if limite_impresiones <= 0: limite_impresiones = 1
-                        except ValueError:
-                            print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
-                            limite_impresiones = 5
-                        iteracion_actual = 0
-                        print("\n--- Iniciando Búsqueda ---")
-
-                        try:
-                            estado_actual = next(generador_algoritmo)
-                        except StopIteration:
-                            pass
                     
-                    # Conexion no informado con algoritmos BFS y DFS
+                    # 2. Preparación para Frozen Lake
                     elif problema_seleccionado == "Frozen Lake (No Informada)":
                         problema = FrozenLake()
                         if algoritmo_seleccionado == "BFS (Anchura)":
                             generador_algoritmo = bfs(problema)
                         elif algoritmo_seleccionado == "DFS (Profundidad)":
                             generador_algoritmo = dfs(problema)
+                            
+                    # 3. Preparación para Gato (Adversaria)
+                    elif problema_seleccionado == "Gato (Adversaria)":
+                        problema = TicTacToe()
+                        if algoritmo_seleccionado == "Poda Alfa-Beta":
+                            generador_algoritmo = alpha_beta_pruning(problema)
 
-                        # ── Pregunta en terminal ──────────────────────
-                        print(f"\nHas seleccionado {algoritmo_seleccionado}.")
-                        try:
-                            entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
-                            limite_impresiones = int(entrada)
-                            if limite_impresiones <= 0: limite_impresiones = 1
-                        except ValueError:
-                            print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
-                            limite_impresiones = 5
-                        iteracion_actual = 0
-                        print("\n--- Iniciando Búsqueda ---")
-                        # ─────────────────────────────────────────────
+                    # --- Lógica común de terminal para todos ---
+                    print(f"\nHas seleccionado {algoritmo_seleccionado}.")   
+                    try:
+                        entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
+                        limite_impresiones = int(entrada)
+                        if limite_impresiones <= 0: limite_impresiones = 1
+                    except ValueError:
+                        print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
+                        limite_impresiones = 5
+                    
+                    iteracion_actual = 0
+                    print("\n--- Iniciando Búsqueda ---")
 
-                        try:
-                            estado_actual = next(generador_algoritmo)
-                        except StopIteration:
-                            pass
+                    try:
+                        estado_actual = next(generador_algoritmo)
+                    except StopIteration:
+                        pass
+                    
                     estado = "VISUALIZACION"
                 y_offset += 80
                 
@@ -374,10 +377,11 @@ def main():
                 estado = "MENU_PROBLEMA"
 
         elif estado == "VISUALIZACION":
+            
+            # === DIBUJO DEPENDIENDO DEL PROBLEMA ===
             if problema_seleccionado == "8 Reinas (Local)":
                 dibujar_reinas(screen, estado_actual, font_info, font_title, imagen_reina)
                 
-                # Avanzar algoritmo automáticamente
                 if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
                     try:
                         estado_actual = next(generador_algoritmo)
@@ -387,38 +391,13 @@ def main():
                         if iteracion_actual <= limite_impresiones:
                             print(f"Iteración: {iteracion_actual} | Costo (Ataques): {estado_actual['ataques']} | Estado: {estado_actual['mensaje']}")
                         elif iteracion_actual == limite_impresiones + 1:
-                            print(f"... (Se han mostrado las primeras {limite_impresiones} iteraciones. Observa el resto en la interfaz gráfica) ...")
+                            print(f"... (Se han mostrado las {limite_impresiones} iteraciones. Observa la interfaz gráfica) ...")
                     except StopIteration:
                         generador_algoritmo = None
                         print(f"--- Búsqueda finalizada en la iteración {iteracion_actual} ---")
                         iteracion_actual = 0
-
-                # --- 3. DIBUJAR PANEL INFERIOR Y BOTONES ---
-                # Fondo del panel inferior
-                pygame.draw.rect(screen, WHITE, (0, TABLERO_Y + 600, WIDTH, HEIGHT - (TABLERO_Y + 600)))
-                
-                # Botón de Reintentar (Izquierda)
-                btn_retry = dibujar_boton(screen, font_button, "Reintentar", 60, HEIGHT - 45, 200, 35, mouse_pos)
-                if btn_retry.collidepoint(mouse_pos) and click:
-                    if problema_seleccionado == "8 Reinas (Local)":
-                        problema = EightQueens()
-                        if algoritmo_seleccionado == "Hill Climbing":
-                            generador_algoritmo = hill_climbing(problema)
-                        elif algoritmo_seleccionado == "Recocido Simulado":
-                            generador_algoritmo = simulated_annealing(problema)
-                            
-                        try:
-                            estado_actual = next(generador_algoritmo)
-                        except StopIteration:
-                            pass
-                # Botón de Volver (Derecha)
-                btn_back = dibujar_boton(screen, font_button, "Volver al Menú", 340, HEIGHT - 45, 200, 35, mouse_pos)
-                if btn_back.collidepoint(mouse_pos) and click:
-                    estado = "MENU_PROBLEMA"
  
-            # ── Frozen Lake ────────────────────────
             elif problema_seleccionado == "Frozen Lake (No Informada)":
-                # Pasar sprites a la función de dibujo
                 dibujar_frozen_lake(screen, estado_actual, font_info, font_title, sprites_fl)
  
                 if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
@@ -428,88 +407,80 @@ def main():
                         iteracion_actual += 1
 
                         if iteracion_actual <= limite_impresiones:
-                            es_bfs          = algoritmo_seleccionado == "BFS (Anchura)"
-                            nombre_frontera = "Cola" if es_bfs else "Pila"
-                            frontera        = estado_actual['frontera']
-                            visitados_log   = sorted(estado_actual['visitados'])
-                            vecinos_log     = estado_actual['vecinos']
-                            pos             = estado_actual['pos_actual']
-
-                            print(f"╔{'═'*50}╗")
-                            print(f"║  Iteración: {iteracion_actual}")
-                            print(f"║  Acción:    Expandiendo nodo {pos}")
-                            print(f"║  {nombre_frontera}:{'':6}{frontera}")
-                            print(f"║  Visitados: {visitados_log}")
-                            print(f"║  Vecinos nuevos encontrados: {len(vecinos_log)}")
-                            print(f"║  Detalle vecinos: {', '.join(str(v) for v in vecinos_log)}")
-                            print(f"╚{'═'*50}╝")
-
-                            # Caso 1: El algoritmo encontró la meta ANTES de agotar el límite
-                            if estado_actual.get('encontrado'):
-                                print(f"{'═'*52}")
-                                print(f"  META ALCANZADA en iteración {iteracion_actual}")
-                                print(f"  Longitud del camino: {len(estado_actual['camino'])} pasos")
-                                print(f"  Total visitados:     {len(estado_actual['visitados'])}")
-                                print(f"{'═'*52}")
-
+                            frontera = estado_actual['frontera']
+                            print(f"Iteración: {iteracion_actual} | Expandiendo: {estado_actual['pos_actual']} | Nodos en Frontera: {len(frontera)}")
                         elif iteracion_actual == limite_impresiones + 1:
-                            # Caso 2: Se agotaron las iteraciones del usuario
-                            print(f"╔{'═'*50}╗")
-                            print(f"║  Se han mostrado las primeras {limite_impresiones} iteraciones.")
-                            print(f"║  Puedes seguir viendo el progreso en la interfaz gráfica.")
-                            print(f"╚{'═'*50}╝")
+                            print(f"... (Se han mostrado las {limite_impresiones} iteraciones. Observa la interfaz gráfica) ...")
 
                     except StopIteration:
                         generador_algoritmo = None
-                        # Caso 1 cuando termina DESPUÉS del límite de impresiones
-                        if estado_actual and estado_actual.get('encontrado'):
-                            print(f"{'═'*52}")
-                            print(f"  META ALCANZADA en iteración {iteracion_actual}")
-                            print(f"  Longitud del camino: {len(estado_actual['camino'])} pasos")
-                            print(f"  Total visitados:     {len(estado_actual['visitados'])}")
-                            print(f"{'═'*52}")
-                        else:
-                            print(f"{'═'*52}")
-                            print(f"  No se encontró solución.")
-                            print(f"  Total iteraciones: {iteracion_actual}")
-                            print(f"{'═'*52}")
+                        print(f"--- Búsqueda finalizada ---")
                         iteracion_actual = 0
+                        
+            elif problema_seleccionado == "Gato (Adversaria)":
+                dibujar_gato(screen, estado_actual, font_info, font_title)
+                
+                if generador_algoritmo and (tiempo_actual - ultimo_paso_tiempo > tiempo_entre_pasos):
+                    try:
+                        estado_actual = next(generador_algoritmo)
+                        ultimo_paso_tiempo = tiempo_actual
+                        iteracion_actual += 1
+
+                        if iteracion_actual <= limite_impresiones:
+                            tablero = estado_actual['tablero']
+                            msg = estado_actual['mensaje']
+                            alfa = estado_actual.get('alfa', '-')
+                            beta = estado_actual.get('beta', '-')
+                            
+                            print(f"\nIteración: {iteracion_actual} | Alfa: {alfa} | Beta: {beta}")
+                            print(f"Estado: {msg}")
+                            print(f" {tablero[0]} | {tablero[1]} | {tablero[2]} ")
+                            print("---+---+---")
+                            print(f" {tablero[3]} | {tablero[4]} | {tablero[5]} ")
+                            print("---+---+---")
+                            print(f" {tablero[6]} | {tablero[7]} | {tablero[8]} ")
+                        elif iteracion_actual == limite_impresiones + 1:
+                            print(f"\n... (Se han mostrado las {limite_impresiones} iteraciones. El árbol sigue explorando en la interfaz gráfica) ...")
+
                     except StopIteration:
                         generador_algoritmo = None
- 
-                pygame.draw.rect(screen, WHITE, (0, HEIGHT - 60, WIDTH, 60))
- 
-                btn_retry = dibujar_boton(screen, font_button, "Reintentar",
-                                          60, HEIGHT - 45, 200, 35, mouse_pos)
-                if btn_retry.collidepoint(mouse_pos) and click:
+                        print(f"--- Búsqueda de Poda Alfa-Beta finalizada ---")
+                        iteracion_actual = 0
+
+            # === DIBUJAR BOTONES COMUNES ===
+            pygame.draw.rect(screen, WHITE, (0, HEIGHT - 60, WIDTH, 60))
+            
+            btn_retry = dibujar_boton(screen, font_button, "Reintentar", 60, HEIGHT - 45, 200, 35, mouse_pos)
+            if btn_retry.collidepoint(mouse_pos) and click:
+                # Reiniciar el mismo problema/algoritmo seleccionado
+                if problema_seleccionado == "8 Reinas (Local)":
+                    problema = EightQueens()
+                    if algoritmo_seleccionado == "Hill Climbing":
+                        generador_algoritmo = hill_climbing(problema)
+                    elif algoritmo_seleccionado == "Recocido Simulado":
+                        generador_algoritmo = simulated_annealing(problema)
+                elif problema_seleccionado == "Frozen Lake (No Informada)":
                     problema = FrozenLake()
                     if algoritmo_seleccionado == "BFS (Anchura)":
                         generador_algoritmo = bfs(problema)
                     elif algoritmo_seleccionado == "DFS (Profundidad)":
                         generador_algoritmo = dfs(problema)
+                elif problema_seleccionado == "Gato (Adversaria)":
+                    problema = TicTacToe()
+                    if algoritmo_seleccionado == "Poda Alfa-Beta":
+                        generador_algoritmo = alpha_beta_pruning(problema)
 
-                    # ── Pregunta en terminal ──────────────────
-                    print(f"\nHas seleccionado {algoritmo_seleccionado}.")
-                    try:
-                        entrada = input("¿Cuántas iteraciones iniciales deseas ver en la terminal? (Ej. 5): ")
-                        limite_impresiones = int(entrada)
-                        if limite_impresiones <= 0: limite_impresiones = 1
-                    except ValueError:
-                        print("Entrada no válida. Se mostrarán 5 iteraciones por defecto.")
-                        limite_impresiones = 5
-                    iteracion_actual = 0
-                    print("\n--- Iniciando Búsqueda ---")
-                    # ─────────────────────────────────────────────────
-                    try:
-                        estado_actual = next(generador_algoritmo)
-                        ultimo_paso_tiempo = tiempo_actual
-                    except StopIteration:
-                        pass
- 
-                btn_back = dibujar_boton(screen, font_button, "Volver al Menú",
-                                         340, HEIGHT - 45, 200, 35, mouse_pos)
-                if btn_back.collidepoint(mouse_pos) and click:
-                    estado = "MENU_PROBLEMA"
+                print(f"\n--- Reiniciando Búsqueda ({algoritmo_seleccionado}) ---")
+                iteracion_actual = 0
+                try:
+                    estado_actual = next(generador_algoritmo)
+                    ultimo_paso_tiempo = tiempo_actual
+                except StopIteration:
+                    pass
+
+            btn_back = dibujar_boton(screen, font_button, "Volver al Menú", 340, HEIGHT - 45, 200, 35, mouse_pos)
+            if btn_back.collidepoint(mouse_pos) and click:
+                estado = "MENU_PROBLEMA"
 
         pygame.display.flip()
         clock.tick(30)
