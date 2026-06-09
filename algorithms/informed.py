@@ -22,9 +22,10 @@ def a_star(problema):
     h0       = problema.heuristica(estado_inicial)
     contador = 0                                       # Desempate en heapq
     # (f, id_único, g, estado)
-    heap     = [(h0, contador, 0, estado_inicial)]
-    visitados = {}                                     # estado → g mínimo
-    pasos    = 0
+    heap          = [(h0, contador, 0, estado_inicial)]
+    visitados     = {}                                 # estado → g mínimo
+    pos_visitadas = set()                              # posiciones jugador ya exploradas
+    pasos         = 0
 
     while heap:
         _, _, g, estado = heapq.heappop(heap)
@@ -36,38 +37,46 @@ def a_star(problema):
         pasos += 1
 
         jugador, cajas = estado
+        pos_visitadas.add(jugador)
         h = problema.heuristica(estado)
+
+        # Posiciones del jugador en los estados de la frontera actual
+        pos_frontera = frozenset(item[3][0] for item in heap)
 
         # ── ¿Meta alcanzada?
         if problema.is_goal(estado):
             yield {
-                "nivel":      nivel_base,
-                "jugador":    jugador,
-                "cajas":      cajas,
-                "metas":      metas,
-                "visitados":  len(visitados),
-                "frontera":   len(heap),
-                "costo":      g,
-                "heuristica": 0,
-                "pasos":      pasos,
-                "encontrado": True,
-                "mensaje":    f"¡Solucion A*! Movs: {g} | Nodos: {len(visitados)}",
+                "nivel":         nivel_base,
+                "jugador":       jugador,
+                "cajas":         cajas,
+                "metas":         metas,
+                "visitados":     len(visitados),
+                "frontera":      len(heap),
+                "costo":         g,
+                "heuristica":    0,
+                "pasos":         pasos,
+                "encontrado":    True,
+                "mensaje":       f"¡Solucion A*! Movs: {g} | Nodos: {len(visitados)}",
+                "pos_visitadas": frozenset(pos_visitadas),
+                "pos_frontera":  pos_frontera,
             }
             return
 
         # ── Yield: mostrar estado actual en pantalla
         yield {
-            "nivel":      nivel_base,
-            "jugador":    jugador,
-            "cajas":      cajas,
-            "metas":      metas,
-            "visitados":  len(visitados),
-            "frontera":   len(heap),
-            "costo":      g,
-            "heuristica": h,
-            "pasos":      pasos,
-            "encontrado": False,
-            "mensaje":    f"A*: g={g} | h={h} | f={g + h}",
+            "nivel":         nivel_base,
+            "jugador":       jugador,
+            "cajas":         cajas,
+            "metas":         metas,
+            "visitados":     len(visitados),
+            "frontera":      len(heap),
+            "costo":         g,
+            "heuristica":    h,
+            "pasos":         pasos,
+            "encontrado":    False,
+            "mensaje":       f"A*: g={g} | h={h} | f={g + h}",
+            "pos_visitadas": frozenset(pos_visitadas),
+            "pos_frontera":  pos_frontera,
         }
 
         # ── Expandir vecinos
@@ -81,17 +90,19 @@ def a_star(problema):
     # Cola vacía sin haber encontrado la meta
     jugador, cajas = estado_inicial
     yield {
-        "nivel":      nivel_base,
-        "jugador":    jugador,
-        "cajas":      cajas,
-        "metas":      metas,
-        "visitados":  len(visitados),
-        "frontera":   0,
-        "costo":      0,
-        "heuristica": h0,
-        "pasos":      pasos,
-        "encontrado": False,
-        "mensaje":    "A*: No se encontro solucion.",
+        "nivel":         nivel_base,
+        "jugador":       jugador,
+        "cajas":         cajas,
+        "metas":         metas,
+        "visitados":     len(visitados),
+        "frontera":      0,
+        "costo":         0,
+        "heuristica":    h0,
+        "pasos":         pasos,
+        "encontrado":    False,
+        "mensaje":       "A*: No se encontro solucion.",
+        "pos_visitadas": frozenset(pos_visitadas),
+        "pos_frontera":  frozenset(),
     }
 
 
@@ -113,12 +124,13 @@ def greedy(problema):
     nivel_base     = problema.get_nivel_base()
     metas          = problema.get_metas()
 
-    h0       = problema.heuristica(estado_inicial)
-    contador = 0
+    h0            = problema.heuristica(estado_inicial)
+    contador      = 0
     # (h, id_único, estado)
-    heap     = [(h0, contador, estado_inicial)]
-    visitados = set()
-    pasos    = 0
+    heap          = [(h0, contador, estado_inicial)]
+    visitados     = set()
+    pos_visitadas = set()                              # posiciones jugador ya exploradas
+    pasos         = 0
 
     while heap:
         h, _, estado = heapq.heappop(heap)
@@ -129,37 +141,45 @@ def greedy(problema):
         pasos += 1
 
         jugador, cajas = estado
+        pos_visitadas.add(jugador)
+
+        # Posiciones del jugador en los estados de la frontera actual
+        pos_frontera = frozenset(item[2][0] for item in heap)
 
         # ── ¿Meta alcanzada?
         if problema.is_goal(estado):
             yield {
-                "nivel":      nivel_base,
-                "jugador":    jugador,
-                "cajas":      cajas,
-                "metas":      metas,
-                "visitados":  len(visitados),
-                "frontera":   len(heap),
-                "costo":      pasos,
-                "heuristica": 0,
-                "pasos":      pasos,
-                "encontrado": True,
-                "mensaje":    f"¡Solucion Voraz! Nodos: {len(visitados)}",
+                "nivel":         nivel_base,
+                "jugador":       jugador,
+                "cajas":         cajas,
+                "metas":         metas,
+                "visitados":     len(visitados),
+                "frontera":      len(heap),
+                "costo":         pasos,
+                "heuristica":    0,
+                "pasos":         pasos,
+                "encontrado":    True,
+                "mensaje":       f"¡Solucion Voraz! Nodos: {len(visitados)}",
+                "pos_visitadas": frozenset(pos_visitadas),
+                "pos_frontera":  pos_frontera,
             }
             return
 
         # ── Yield: mostrar estado actual en pantalla
         yield {
-            "nivel":      nivel_base,
-            "jugador":    jugador,
-            "cajas":      cajas,
-            "metas":      metas,
-            "visitados":  len(visitados),
-            "frontera":   len(heap),
-            "costo":      pasos,
-            "heuristica": h,
-            "pasos":      pasos,
-            "encontrado": False,
-            "mensaje":    f"Voraz: h={h} (solo heuristica)",
+            "nivel":         nivel_base,
+            "jugador":       jugador,
+            "cajas":         cajas,
+            "metas":         metas,
+            "visitados":     len(visitados),
+            "frontera":      len(heap),
+            "costo":         pasos,
+            "heuristica":    h,
+            "pasos":         pasos,
+            "encontrado":    False,
+            "mensaje":       f"Voraz: h={h} (solo heuristica)",
+            "pos_visitadas": frozenset(pos_visitadas),
+            "pos_frontera":  pos_frontera,
         }
 
         # ── Expandir vecinos (sin considerar g)
@@ -172,15 +192,17 @@ def greedy(problema):
     # Cola vacía sin solución
     jugador, cajas = estado_inicial
     yield {
-        "nivel":      nivel_base,
-        "jugador":    jugador,
-        "cajas":      cajas,
-        "metas":      metas,
-        "visitados":  len(visitados),
-        "frontera":   0,
-        "costo":      0,
-        "heuristica": h0,
-        "pasos":      pasos,
-        "encontrado": False,
-        "mensaje":    "Voraz: No se encontro solucion.",
+        "nivel":         nivel_base,
+        "jugador":       jugador,
+        "cajas":         cajas,
+        "metas":         metas,
+        "visitados":     len(visitados),
+        "frontera":      0,
+        "costo":         0,
+        "heuristica":    h0,
+        "pasos":         pasos,
+        "encontrado":    False,
+        "mensaje":       "Voraz: No se encontro solucion.",
+        "pos_visitadas": frozenset(pos_visitadas),
+        "pos_frontera":  frozenset(),
     }

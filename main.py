@@ -264,16 +264,18 @@ def dibujar_sokoban(screen, estado_dict, font_info, font_title):
     if not estado_dict or "nivel" not in estado_dict:
         return
 
-    nivel      = estado_dict["nivel"]
-    jugador    = estado_dict["jugador"]
-    cajas      = estado_dict["cajas"]
-    metas      = estado_dict["metas"]
-    visitados  = estado_dict["visitados"]
-    frontera   = estado_dict["frontera"]
-    costo      = estado_dict["costo"]
-    heuristica = estado_dict["heuristica"]
-    encontrado = estado_dict["encontrado"]
-    mensaje    = estado_dict["mensaje"]
+    nivel         = estado_dict["nivel"]
+    jugador       = estado_dict["jugador"]
+    cajas         = estado_dict["cajas"]
+    metas         = estado_dict["metas"]
+    visitados     = estado_dict["visitados"]
+    frontera      = estado_dict["frontera"]
+    costo         = estado_dict["costo"]
+    heuristica    = estado_dict["heuristica"]
+    encontrado    = estado_dict["encontrado"]
+    mensaje       = estado_dict["mensaje"]
+    pos_visitadas = estado_dict.get("pos_visitadas", frozenset())
+    pos_frontera  = estado_dict.get("pos_frontera",  frozenset())
 
     FILAS    = len(nivel)
     COLUMNAS = len(nivel[0])
@@ -325,12 +327,21 @@ def dibujar_sokoban(screen, estado_dict, font_info, font_title):
             else:
                 pygame.draw.rect(screen, COL_FLOOR, rect)
 
+            # Overlay del árbol de búsqueda (solo sobre celdas transitables)
+            if celda != '#':
+                if pos == jugador:
+                    dibujar_celda_con_overlay(screen, rect, ORANGE,     alpha=170)
+                elif pos in pos_frontera:
+                    dibujar_celda_con_overlay(screen, rect, YELLOW,     alpha=130)
+                elif pos in pos_visitadas:
+                    dibujar_celda_con_overlay(screen, rect, LIGHT_BLUE, alpha=110)
+
             # Caja (normal o sobre meta)
             if pos in cajas:
-                color_caja  = COL_BOX_OK if pos in metas else COL_BOX
-                mg          = tam // 8
-                rect_caja   = pygame.Rect(rect.x + mg, rect.y + mg,
-                                          tam - 2 * mg, tam - 2 * mg)
+                color_caja = COL_BOX_OK if pos in metas else COL_BOX
+                mg         = tam // 8
+                rect_caja  = pygame.Rect(rect.x + mg, rect.y + mg,
+                                         tam - 2 * mg, tam - 2 * mg)
                 pygame.draw.rect(screen, color_caja, rect_caja, border_radius=4)
                 pygame.draw.rect(screen, BLACK, rect_caja, 2, border_radius=4)
 
@@ -346,6 +357,22 @@ def dibujar_sokoban(screen, estado_dict, font_info, font_title):
     # Separador visual inferior
     linea_y = margen_y + FILAS * tam
     pygame.draw.line(screen, BLACK, (0, linea_y), (WIDTH, linea_y), 2)
+
+    # Leyenda de colores del árbol de búsqueda
+    font_leyenda = pygame.font.SysFont(None, 20)
+    leyenda = [
+        (ORANGE,     "Actual"),
+        (YELLOW,     "Frontera"),
+        (LIGHT_BLUE, "Visitado"),
+    ]
+    x_ley = 8
+    y_ley = linea_y + 8
+    for color_ley, texto_ley in leyenda:
+        pygame.draw.rect(screen, color_ley,  (x_ley,      y_ley, 14, 14))
+        pygame.draw.rect(screen, DARK_GRAY,  (x_ley,      y_ley, 14, 14), 1)
+        etiqueta = font_leyenda.render(texto_ley, True, BLACK)
+        screen.blit(etiqueta, (x_ley + 17, y_ley))
+        x_ley += 95
 
 
 # --- BUCLE PRINCIPAL ---
